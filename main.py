@@ -1,6 +1,6 @@
 from jira import JIRA
 
-jira_options = {'server': 'https://tms.netcracker.com/'}
+jira_options = {'server': ''}
 jira = JIRA(options=jira_options, basic_auth=('', ''))
 
 jql = 'assignee = currentUser() AND resolution = Unresolved order by updated DESC'
