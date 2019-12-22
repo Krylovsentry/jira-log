@@ -39,6 +39,9 @@ if __name__ == "__main__":
 
     jira_options = {'server': jira_server}
     jira = JIRA(options=jira_options, basic_auth=(user_name, password))
-    jql = 'assignee = currentUser() AND resolution = Unresolved order by updated DESC'
-    issues_list = jira.search_issues(jql)
-    jira.add_worklog('', timeSpent='2h')
+
+    print('Some')
+
+    # jql = 'assignee = currentUser() AND resolution = Unresolved order by updated DESC'
+    # issues_list = jira.search_issues(jql)
+    # jira.add_worklog('', timeSpent='2h')
