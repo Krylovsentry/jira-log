@@ -1,3 +1,3 @@
 # jira-log
 
-Add folder to global variables for using anywhere :alien:
+Add folder to global(environment) variables for using anywhere :alien:
