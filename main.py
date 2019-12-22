@@ -37,6 +37,14 @@ def create_issue(project, estimation, bug):
     pass
 
 
+def log_work(issue, time):
+    pass
+
+
+def get_issue_full_name(issue):
+    pass
+
+
 if __name__ == "__main__":
     path = "settings.ini"
     [jira_server, project, user_name, password] = crud_config(path)
