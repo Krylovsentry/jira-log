@@ -12,7 +12,7 @@ def create_config(path):
     config.add_section("Settings")
     config.set("Settings", "jira_server", "jira server")
     config.set("Settings", "project", "project name")
-    config.set("Settings", "username", "your username")
+    config.set("Settings", "user_name", "your username")
     config.set("Settings", "password", "your password")
 
     with open(path, "w") as config_file:
@@ -29,7 +29,8 @@ def crud_config(path):
         config.get("Settings", "jira_server"),
         config.get("Settings", "project"),
         config.get("Settings", "user_name"),
-        config.get("Settings", "password")
+        config.get("Settings", "password"),
+        config.get("Setting", "command")
     ]
 
 
@@ -51,9 +52,5 @@ if __name__ == "__main__":
 
     jira_options = {'server': jira_server}
     jira = JIRA(options=jira_options, basic_auth=(user_name, password))
+    print("HEY")
 
-    print('Some')
-
-    # jql = 'assignee = currentUser() AND resolution = Unresolved order by updated DESC'
-    # issues_list = jira.search_issues(jql)
-    # jira.add_worklog('', timeSpent='2h')

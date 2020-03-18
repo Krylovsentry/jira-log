@@ -1,4 +1,4 @@
 #!/usr/bin/env bash
 
-python main.py
+python ./jirac.py
 cmd /k
