@@ -33,20 +33,41 @@ def crud_config(path):
         config.get("Settings", "password"),
         config.get("Settings", "team"),
         config.get("Settings", "cis_team"),
-        config.get("Settings", "brazil_team")
+        config.get("Settings", "brazil_team"),
+        config.get("Settings", "component")
     ]
+
+
+def team_assign(jira, lead, team, count=2):
+    for user in str(team).split(','):
+        issues = jira.search_issues(
+            f'assignee = {user} AND resolution = Unresolved and type in (Bug, Defect) and status in (Open)')
+        if issues.total < count:
+            lead_issues = jira.search_issues(
+                f'assignee = {lead} AND resolution = Unresolved and type in (Bug, Defect) and status in (Open) ORDER BY priority DESC')
+            jira.assign_issue(lead_issues.next(), user)
+            jira.assign_issue(lead_issues.next(), user)
+
+
+def create_issue(jira, project, summary, component, lead):
+    issue_dict = {
+        'project': project,
+        'summary': summary,
+        'description': summary,
+        'issuetype': {'name': 'Defect'},
+        'components': [{'name': component}],
+        'assignee': {'name': lead},
+        'customfield_10014': {'id': '10010'}
+    }
+    jira.create_issue(fields=issue_dict)
+
 
 if __name__ == "__main__":
     path = "settings.ini"
-    [jira_server, project, user_name, password, team, cis_team, brazil_team] = crud_config(path)
+    [jira_server, project, user_name, password, team, cis_team, brazil_team, component] = crud_config(path)
 
     # initialize jira api
     jira_options = {'server': jira_server}
     jira = JIRA(options=jira_options, basic_auth=(user_name, password))
-
-    for user in str(cis_team).split(','):
-        issues = jira.search_issues(f'assignee = {user} AND resolution = Unresolved and type in (Bug, Defect) and status in (Open)')
-        if issues.total < 2:
-            lead_issues = jira.search_issues(f'assignee = {user_name} AND resolution = Unresolved and type in (Bug, Defect) and status in (Open) ORDER BY priority DESC')
-            jira.assign_issue(lead_issues.next(), user)
-            jira.assign_issue(lead_issues.next(), user)
+    # team_assign(jira, user_name, cis_team, 2)
+    create_issue(jira, project, 'Test issue', component, user_name)
