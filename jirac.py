@@ -38,7 +38,6 @@ def crud_config(path):
     ]
 
 
-
 def team_assign(jira, lead, team, count=2):
     for user in str(team).split(','):
         issues = jira.search_issues(
