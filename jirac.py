@@ -61,6 +61,11 @@ def create_issue(jira, project, summary, component, lead):
     }
     jira.create_issue(fields=issue_dict)
 
+def issues_resolved(user, type):
+    pass
+
+def time_logged():
+    pass
 
 if __name__ == "__main__":
     path = "settings.ini"
@@ -70,4 +75,4 @@ if __name__ == "__main__":
     jira_options = {'server': jira_server}
     jira = JIRA(options=jira_options, basic_auth=(user_name, password))
     # team_assign(jira, user_name, cis_team, 2)
-    create_issue(jira, project, 'Test issue', component, user_name)
+    # create_issue(jira, project, 'Test issue', component, user_name)
