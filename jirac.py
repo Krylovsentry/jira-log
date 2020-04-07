@@ -61,10 +61,19 @@ def create_issue(jira, project, summary, component, lead):
     }
     jira.create_issue(fields=issue_dict)
 
-def issues_resolved(user, type):
-    pass
+
+def issues_resolved(jira, user, type):
+    return jira.search_issues(
+        f'status changed by {user} AND resolutiondate >= startOfWeek(-14d) AND resolutiondate < endOfWeek(-7d) and type in ({type})')
+
 
 def time_logged():
+    pass
+
+
+def count_velocity():
+    # | time logged * (2 / count of tasks + 1 / bugs)
+    # || original estimate / logged on ticket
     pass
 
 if __name__ == "__main__":
@@ -74,5 +83,6 @@ if __name__ == "__main__":
     # initialize jira api
     jira_options = {'server': jira_server}
     jira = JIRA(options=jira_options, basic_auth=(user_name, password))
-    # team_assign(jira, user_name, cis_team, 2)
+    team_assign(jira, user_name, cis_team, 2)
+
     # create_issue(jira, project, 'Test issue', component, user_name)
