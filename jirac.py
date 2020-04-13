@@ -40,7 +40,7 @@ def crud_config(path):
 
 if __name__ == "__main__":
     path = "settings.ini"
-    [jira_server, project, user_name, password, team, component, brazil_team] = crud_config(path)
+    [jira_server, project, user_name, password, team, brazil_team, component] = crud_config(path)
 
     # initialize jira api
     jira_options = {'server': jira_server}
@@ -48,3 +48,8 @@ if __name__ == "__main__":
         JIRA(options=jira_options, basic_auth=(user_name, password)),
         team, user_name, component, project
     )
+
+    some = jiraProxy.count_velocity_on_tasks()
+    print('end of')
+
+
