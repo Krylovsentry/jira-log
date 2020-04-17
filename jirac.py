@@ -46,6 +46,8 @@ if __name__ == "__main__":
     # initialize jira api
     jira_options = {'server': jira_server}
     jiraProxy = JiraProxy(
-        JIRA(options=jira_options, basic_auth=(user_name, password)),
+        {},
         str(team).split(',') + str(brazil_team).split(','), user_name, component, project, jira_server
     )
+
+    jiraProxy.make_velocities()

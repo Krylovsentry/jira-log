@@ -4,8 +4,8 @@ import matplotlib.pyplot as plt
 
 
 class JiraProxy(object):
-    def __init__(self, jira, team, lead, component, project, jira_server):
-        with open('data.json', 'r') as f:
+    def __init__(self, jira, team, lead, component, project, jira_server, path='data.json'):
+        with open(path, 'r') as f:
             self.prev_data = json.load(f)
 
         self.jira = jira
@@ -83,9 +83,25 @@ class JiraProxy(object):
             bugs_count[key] = bugs_count[key] / self.median * 100
         return bugs_count
 
-    def make_velocities(self):
+    def update_data(self, path):
         bugs = self.prev_data['bugs'] if 'bugs' in self.prev_data else []
         bugs.append(self.count_of_bugs())
+
+        tasks = self.prev_data['tasks'] if 'tasks' in self.prev_data else []
+        tasks.append(self.count_velocity_on_tasks())
+
+        data = {'tasks': tasks, 'bugs': bugs, 'median': self.get_median()}
+        with open('data.json', 'w') as outfile:
+            json.dump(data, outfile)
+
+    def load_data(self, path='data.json'):
+        with open(path, 'r') as f:
+            self.prev_data = json.load(f)
+
+    def make_velocities(self):
+        self.load_data()
+        bugs = self.prev_data['bugs']
+        tasks = self.prev_data['tasks']
         for user in self.team:
             bug_temp = []
             week = []
@@ -97,23 +113,16 @@ class JiraProxy(object):
         plt.title('Bugs')
         plt.show()
 
-        tasks = self.prev_data['tasks'] if 'tasks' in self.prev_data else []
-
-        tasks.append(self.count_velocity_on_tasks())
         for user in self.team:
             tasks_temp = []
             week = []
-            for j in range(len(bugs)):
+            for j in range(len(tasks)):
                 tasks_temp.append(tasks[j][user] if user in tasks[j].keys() else 0)
                 week.append(j)
             plt.plot(week, tasks_temp, label=str(user))
         plt.legend()
         plt.title('Tasks')
         plt.show()
-
-        data = {'tasks': tasks, 'bugs': bugs, 'median': self.get_median()}
-        with open('data.json', 'w') as outfile:
-            json.dump(data, outfile)
 
     def get_median(self):
         return self.median
