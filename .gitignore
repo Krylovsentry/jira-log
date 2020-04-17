@@ -1,3 +1,5 @@
 *.ini
 venv
 .idea
+*.json
+*.txt

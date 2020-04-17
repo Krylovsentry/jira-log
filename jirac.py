@@ -1,7 +1,8 @@
 import configparser
+import json
 import os
-import matplotlib
 
+import matplotlib.pyplot as plt
 from jira import JIRA
 
 from jirap import JiraProxy
@@ -39,31 +40,49 @@ def crud_config(path):
         config.get("Settings", "component")
     ]
 
+
 if __name__ == "__main__":
     path = "settings.ini"
     [jira_server, project, user_name, password, team, brazil_team, component] = crud_config(path)
+
+    with open('data.json', 'r') as f:
+        prev_data = json.load(f)
 
     # initialize jira api
     jira_options = {'server': jira_server}
     jiraProxy = JiraProxy(
         JIRA(options=jira_options, basic_auth=(user_name, password)),
-        team, user_name, component, project, jira_server
+        str(team).split(',') + str(brazil_team).split(','), user_name, component, project, jira_server,
+        prev_data['median']
     )
 
-    tasks_velocity_2_weeks = jiraProxy.count_velocity_on_tasks()
-    bugs_velocity_2_weeks = jiraProxy.count_of_bugs()
-    tasks_velocity_3_weeks = jiraProxy.count_velocity_on_tasks(3, 4)
-    bugs_velocity_3_weeks = jiraProxy.count_of_bugs(3, 4)
-    tasks_velocity_4_weeks = jiraProxy.count_velocity_on_tasks(5, 6)
-    bugs_velocity_4_weeks = jiraProxy.count_of_bugs(5, 6)
-    tasks_velocity_5_weeks = jiraProxy.count_velocity_on_tasks(7, 8)
-    bugs_velocity_5_weeks = jiraProxy.count_of_bugs(7, 8)
-    tasks_velocity_6_weeks = jiraProxy.count_velocity_on_tasks(9, 10)
-    bugs_velocity_6_weeks = jiraProxy.count_of_bugs(9, 10)
-    tasks_velocity_7_weeks = jiraProxy.count_velocity_on_tasks(11, 12)
-    bugs_velocity_7_weeks = jiraProxy.count_of_bugs(11, 12)
-    tasks_velocity_8_weeks = jiraProxy.count_velocity_on_tasks(13, 14)
-    bugs_velocity_8_weeks = jiraProxy.count_of_bugs(13, 14)
-    print(tasks_velocity_2_weeks, bugs_velocity_2_weeks, tasks_velocity_3_weeks, bugs_velocity_3_weeks, tasks_velocity_4_weeks, bugs_velocity_4_weeks)
+    bugs = prev_data['bugs']
+    bugs.append(jiraProxy.count_of_bugs())
+    for user in str(team).split(',') + str(brazil_team).split(','):
+        bug_temp = []
+        week = []
+        for j in range(len(bugs)):
+            bug_temp.append(bugs[j][user])
+            week.append(j)
+        plt.plot(week, bug_temp, label=str(user))
+    plt.legend()
+    plt.title('Bugs')
+    plt.show()
 
+    tasks = prev_data['tasks']
 
+    tasks.append(jiraProxy.count_velocity_on_tasks())
+    for user in str(team).split(',') + str(brazil_team).split(','):
+        tasks_temp = []
+        week = []
+        for j in range(len(bugs)):
+            tasks_temp.append(tasks[j][user] if user in tasks[j].keys() else 0)
+            week.append(j)
+        plt.plot(week, tasks_temp, label=str(user))
+    plt.legend()
+    plt.title('Tasks')
+    plt.show()
+
+    data = {'tasks': tasks, 'bugs': bugs, 'median': jiraProxy.get_median()}
+    with open('data.json', 'w') as outfile:
+        json.dump(data, outfile)

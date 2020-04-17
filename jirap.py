@@ -1,12 +1,12 @@
 class JiraProxy(object):
-    def __init__(self, jira, team, lead, component, project, jira_server):
+    def __init__(self, jira, team, lead, component, project, jira_server, median=0):
         self.jira = jira
-        self.team = str(team).split(',')
+        self.team = team
         self.lead = lead
         self.component = component
         self.project = project
         self.jira_server = jira_server
-        self.median = 0
+        self.median = median
 
     def issues_resolved(self, user, type_of_issue):
         return self.jira.search_issues(
@@ -74,3 +74,6 @@ class JiraProxy(object):
         for key in bugs_count.keys():
             bugs_count[key] = bugs_count[key] / self.median * 100
         return bugs_count
+
+    def get_median(self):
+        return self.median
