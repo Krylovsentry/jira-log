@@ -1,5 +1,6 @@
 import configparser
 import os
+import matplotlib
 
 from jira import JIRA
 
@@ -46,10 +47,23 @@ if __name__ == "__main__":
     jira_options = {'server': jira_server}
     jiraProxy = JiraProxy(
         JIRA(options=jira_options, basic_auth=(user_name, password)),
-        team, user_name, component, project
+        team, user_name, component, project, jira_server
     )
 
-    some = jiraProxy.count_velocity_on_tasks()
-    print('end of')
+    tasks_velocity_2_weeks = jiraProxy.count_velocity_on_tasks()
+    bugs_velocity_2_weeks = jiraProxy.count_of_bugs()
+    tasks_velocity_3_weeks = jiraProxy.count_velocity_on_tasks(3, 4)
+    bugs_velocity_3_weeks = jiraProxy.count_of_bugs(3, 4)
+    tasks_velocity_4_weeks = jiraProxy.count_velocity_on_tasks(5, 6)
+    bugs_velocity_4_weeks = jiraProxy.count_of_bugs(5, 6)
+    tasks_velocity_5_weeks = jiraProxy.count_velocity_on_tasks(7, 8)
+    bugs_velocity_5_weeks = jiraProxy.count_of_bugs(7, 8)
+    tasks_velocity_6_weeks = jiraProxy.count_velocity_on_tasks(9, 10)
+    bugs_velocity_6_weeks = jiraProxy.count_of_bugs(9, 10)
+    tasks_velocity_7_weeks = jiraProxy.count_velocity_on_tasks(11, 12)
+    bugs_velocity_7_weeks = jiraProxy.count_of_bugs(11, 12)
+    tasks_velocity_8_weeks = jiraProxy.count_velocity_on_tasks(13, 14)
+    bugs_velocity_8_weeks = jiraProxy.count_of_bugs(13, 14)
+    print(tasks_velocity_2_weeks, bugs_velocity_2_weeks, tasks_velocity_3_weeks, bugs_velocity_3_weeks, tasks_velocity_4_weeks, bugs_velocity_4_weeks)
 
 
