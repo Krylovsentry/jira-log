@@ -1,12 +1,20 @@
+import json
+
+import matplotlib.pyplot as plt
+
+
 class JiraProxy(object):
-    def __init__(self, jira, team, lead, component, project, jira_server, median=0):
+    def __init__(self, jira, team, lead, component, project, jira_server):
+        with open('data.json', 'r') as f:
+            self.prev_data = json.load(f)
+
         self.jira = jira
         self.team = team
         self.lead = lead
         self.component = component
         self.project = project
         self.jira_server = jira_server
-        self.median = median
+        self.median = self.prev_data['median'] if 'median' in self.prev_data else 0
 
     def issues_resolved(self, user, type_of_issue):
         return self.jira.search_issues(
@@ -74,6 +82,38 @@ class JiraProxy(object):
         for key in bugs_count.keys():
             bugs_count[key] = bugs_count[key] / self.median * 100
         return bugs_count
+
+    def make_velocities(self):
+        bugs = self.prev_data['bugs'] if 'bugs' in self.prev_data else []
+        bugs.append(self.count_of_bugs())
+        for user in self.team:
+            bug_temp = []
+            week = []
+            for j in range(len(bugs)):
+                bug_temp.append(bugs[j][user])
+                week.append(j)
+            plt.plot(week, bug_temp, label=str(user))
+        plt.legend()
+        plt.title('Bugs')
+        plt.show()
+
+        tasks = self.prev_data['tasks'] if 'tasks' in self.prev_data else []
+
+        tasks.append(self.count_velocity_on_tasks())
+        for user in self.team:
+            tasks_temp = []
+            week = []
+            for j in range(len(bugs)):
+                tasks_temp.append(tasks[j][user] if user in tasks[j].keys() else 0)
+                week.append(j)
+            plt.plot(week, tasks_temp, label=str(user))
+        plt.legend()
+        plt.title('Tasks')
+        plt.show()
+
+        data = {'tasks': tasks, 'bugs': bugs, 'median': self.get_median()}
+        with open('data.json', 'w') as outfile:
+            json.dump(data, outfile)
 
     def get_median(self):
         return self.median
