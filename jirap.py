@@ -110,9 +110,15 @@ class JiraProxy(object):
                 bug_temp.append(bugs[j][user])
                 week.append(j)
             plt.plot(week, bug_temp, label=str(user))
-        plt.legend()
-        plt.title('Bugs')
-        plt.show()
+            if not team:
+                plt.title(f'Bugs for {user}')
+                plt.savefig(f'{user}-bugs.png')
+                plt.show()
+        if team:
+            plt.legend()
+            plt.title('Bugs')
+            plt.savefig(f'team-bugs.png')
+            plt.show()
 
         for user in self.team:
             tasks_temp = []
@@ -121,9 +127,15 @@ class JiraProxy(object):
                 tasks_temp.append(tasks[j][user] if user in tasks[j].keys() else 0)
                 week.append(j)
             plt.plot(week, tasks_temp, label=str(user))
-        plt.legend()
-        plt.title('Tasks')
-        plt.show()
+            if not team:
+                plt.title(f'Tasks for {user}')
+                plt.savefig(f'{user}-tasks.png')
+                plt.show()
+        if team:
+            plt.legend()
+            plt.title('Tasks')
+            plt.savefig(f'team-tasks.png')
+            plt.show()
 
     def get_median(self):
         return self.median
