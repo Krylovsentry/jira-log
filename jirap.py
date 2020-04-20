@@ -48,11 +48,11 @@ class JiraProxy(object):
             f'worklogAuthor = {user} AND (worklogDate >= startOfWeek(-14d) AND worklogDate <= endOfWeek(-14d)) and type in ({type_of_issue}) {other_conditions_with_and}'
         )
 
-    def count_velocity_on_tasks(self, start_week=1, end_week=2):
+    def count_velocity_on_tasks(self, week=1):
         velocities = {}
         for user in self.team:
             issues = self.jira.search_issues(
-                f'worklogAuthor = {user} AND (worklogDate >= startOfWeek(-{end_week * 7}d) AND worklogDate <= endOfWeek(-{start_week * 7}d)) and type in ("Dev Task") and (labels != "time-track" or labels is EMPTY )')
+                f'worklogAuthor = {user} AND (worklogDate >= startOfWeek(-{week * 7}d) AND worklogDate <= endOfWeek(-{week * 7}d)) and type in ("Dev Task") and (labels != "time-track" or labels is EMPTY )')
 
             velocity_temp = []
             for issue in issues:
@@ -71,19 +71,20 @@ class JiraProxy(object):
                 velocities[user] = sum(velocity_temp) / len(velocity_temp)
         return velocities
 
-    def count_of_bugs(self, start_week=1, end_week=2):
+    def count_of_bugs(self, week=1):
         bugs_count = {}
         for user in self.team:
             issues = self.jira.search_issues(
-                f'status changed by {user} AND resolutiondate >= startOfWeek(-{end_week * 7}d) AND resolutiondate < endOfWeek(-{start_week * 7}d)')
+                f'status changed by {user} AND resolutiondate >= startOfWeek(-{week * 7}d) AND resolutiondate < endOfWeek(-{week * 7}d)')
             bugs_count[user] = len(issues)
 
-        self.median = (sum(bugs_count.values()) + self.median) / (len(bugs_count) + 1)
+        self.median = ((sum(bugs_count.values()) / (len(bugs_count))) + self.median) / 2
         for key in bugs_count.keys():
             bugs_count[key] = bugs_count[key] / self.median * 100
         return bugs_count
 
-    def update_data(self, path):
+    def update_data(self, path='data.json'):
+        self.load_data()
         bugs = self.prev_data['bugs'] if 'bugs' in self.prev_data else []
         bugs.append(self.count_of_bugs())
 
@@ -91,14 +92,14 @@ class JiraProxy(object):
         tasks.append(self.count_velocity_on_tasks())
 
         data = {'tasks': tasks, 'bugs': bugs, 'median': self.get_median()}
-        with open('data.json', 'w') as outfile:
+        with open(path, 'w') as outfile:
             json.dump(data, outfile)
 
     def load_data(self, path='data.json'):
         with open(path, 'r') as f:
             self.prev_data = json.load(f)
 
-    def make_velocities(self):
+    def make_velocities(self, team=True):
         self.load_data()
         bugs = self.prev_data['bugs']
         tasks = self.prev_data['tasks']
@@ -126,3 +127,16 @@ class JiraProxy(object):
 
     def get_median(self):
         return self.median
+
+    def get_time_for(self, label, ticket_type="Defect", weeks=4):
+        time_spent = 0
+        for user in self.team:
+            issues = self.jira.search_issues(
+                f'worklogAuthor = {user} AND (worklogDate >= startOfWeek({-7 * weeks}d) AND worklogDate <= endOfWeek(-7d)) and type in ({ticket_type}) and (labels = {label})')
+            for issue in issues:
+                work_logs = self.jira.worklogs(issue)
+                for work_log in work_logs:
+                    if work_log.author.key == user:
+                        time_spent += work_log.timeSpentSeconds
+
+        return time_spent / weeks
