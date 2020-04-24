@@ -76,7 +76,8 @@ class JiraProxy(object):
         for user in self.team:
             issues = self.jira.search_issues(
                 f'status changed by {user} AND resolutiondate >= startOfWeek(-{week * 7}d) AND resolutiondate < endOfWeek(-{week * 7}d)')
-            bugs_count[user] = len(issues)
+            if len(issues):
+                bugs_count[user] = len(issues)
 
         self.median = ((sum(bugs_count.values()) / (len(bugs_count))) + self.median) / 2
         for key in bugs_count.keys():
@@ -87,9 +88,33 @@ class JiraProxy(object):
         self.load_data()
         bugs = self.prev_data['bugs'] if 'bugs' in self.prev_data else []
         bugs.append(self.count_of_bugs())
+        bugs.append(self.count_of_bugs(2))
+        bugs.append(self.count_of_bugs(3))
+        bugs.append(self.count_of_bugs(4))
+        bugs.append(self.count_of_bugs(5))
+        bugs.append(self.count_of_bugs(6))
+        bugs.append(self.count_of_bugs(7))
+        bugs.append(self.count_of_bugs(8))
+        bugs.append(self.count_of_bugs(9))
+        bugs.append(self.count_of_bugs(10))
+        bugs.append(self.count_of_bugs(11))
+        bugs.append(self.count_of_bugs(12))
+        bugs.append(self.count_of_bugs(13))
 
         tasks = self.prev_data['tasks'] if 'tasks' in self.prev_data else []
         tasks.append(self.count_velocity_on_tasks())
+        tasks.append(self.count_velocity_on_tasks(2))
+        tasks.append(self.count_velocity_on_tasks(3))
+        tasks.append(self.count_velocity_on_tasks(4))
+        tasks.append(self.count_velocity_on_tasks(5))
+        tasks.append(self.count_velocity_on_tasks(6))
+        tasks.append(self.count_velocity_on_tasks(7))
+        tasks.append(self.count_velocity_on_tasks(8))
+        tasks.append(self.count_velocity_on_tasks(9))
+        tasks.append(self.count_velocity_on_tasks(10))
+        tasks.append(self.count_velocity_on_tasks(11))
+        tasks.append(self.count_velocity_on_tasks(12))
+        tasks.append(self.count_velocity_on_tasks(13))
 
         data = {'tasks': tasks, 'bugs': bugs, 'median': self.get_median()}
         with open(path, 'w') as outfile:
@@ -107,7 +132,7 @@ class JiraProxy(object):
             bug_temp = []
             week = []
             for j in range(len(bugs)):
-                bug_temp.append(bugs[j][user])
+                bug_temp.append(bugs[j][user] if user in bugs[j] else 0)
                 week.append(j)
             plt.plot(week, bug_temp, label=str(user))
             if not team:
