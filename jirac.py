@@ -50,6 +50,6 @@ if __name__ == "__main__":
         str(team).split(',') + str(brazil_team).split(','), user_name, component, project, jira_server
     )
 
-    #
-    jiraProxy.make_velocities(False)
+    jiraProxy.update_data()
     jiraProxy.make_velocities()
+    jiraProxy.make_velocities(False)

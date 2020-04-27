@@ -153,3 +153,15 @@ class JiraProxy(object):
                         time_spent += work_log.timeSpentSeconds
 
         return time_spent / weeks
+
+    def get_time_for_tasks_for_user(self, label, user, ticket_type="Defect", weeks=1):
+        time_spent = 0
+        issues = self.jira.search_issues(
+            f'worklogAuthor = {user} AND (worklogDate >= startOfWeek({-7 * weeks}d) AND worklogDate <= endOfWeek({-7 * weeks}d)) and type in ({ticket_type}) and (labels = {label})')
+        for issue in issues:
+            work_logs = self.jira.worklogs(issue)
+            for work_log in work_logs:
+                if work_log.author.key == user:
+                    time_spent += work_log.timeSpentSeconds
+
+        return time_spent / weeks
