@@ -51,6 +51,9 @@ if __name__ == "__main__":
         str(team).split(','), user_name, component, project, jira_server
     )
 
+    jiraProxy.make_velocities()
+    jiraProxy.make_velocities(False)
+
     parser = ArgumentParser()
     parser.add_argument("-u", "--update",
                         help="update data from previous week",

@@ -4,3 +4,4 @@ venv
 *.json
 *.txt
 *.png
+/old_data/

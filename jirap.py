@@ -1,4 +1,5 @@
 import json
+import os
 
 import matplotlib.pyplot as plt
 
@@ -104,38 +105,66 @@ class JiraProxy(object):
         self.load_data()
         bugs = self.prev_data['bugs']
         tasks = self.prev_data['tasks']
+        fig = plt.figure()
+        fig.set_figwidth(len(bugs) / 2)
         for user in self.team:
             bug_temp = []
             week = []
             for j in range(len(bugs)):
-                bug_temp.append(bugs[j][user] if user in bugs[j] else 0)
+                bug_temp.append(bugs[j][user] if user in bugs[j] else None)
                 week.append(j)
-            plt.plot(week, bug_temp, label=str(user))
+            for_mark = []
+            if len(list(filter(lambda x: x is not None, bug_temp))):
+                bug_temp.append(self.forecast(list(filter(lambda x: x is not None, bug_temp))))
+                for_mark = [len(week), len(week) - 1]
+                week.append(len(week))
+
+            plt.plot(week, bug_temp, '-D', label=str(user), markevery=for_mark)
+            plt.xticks(week)
             if not team:
                 plt.title(f'Bugs for {user}')
-                plt.savefig(f'{user}-bugs.png')
+                if 'dev' not in os.listdir(os.getcwd()):
+                    os.makedirs('dev')
+                plt.savefig(f'dev/{user}-bugs.png')
                 plt.show()
         if team:
             plt.legend()
             plt.title('Bugs')
-            plt.savefig(f'team-bugs.png')
+            if 'team' not in os.listdir(os.getcwd()):
+                os.makedirs('team')
+            plt.savefig(f'team/team-bugs.png')
             plt.show()
 
+        fig = plt.figure()
+        fig.set_figwidth(len(tasks) / 2)
         for user in self.team:
             tasks_temp = []
             week = []
+            delta = 0
             for j in range(len(tasks)):
-                tasks_temp.append(tasks[j][user] if user in tasks[j].keys() else 0)
+                current = tasks[j][user] if user in tasks[j].keys() else None
+                tasks_temp.append(current)
                 week.append(j)
-            plt.plot(week, tasks_temp, label=str(user))
+            for_mark = []
+            if len(list(filter(lambda x: x is not None, tasks_temp))):
+                tasks_temp.append(self.forecast(list(filter(lambda x: x is not None, tasks_temp))))
+                for_mark = [len(week), len(week) - 1]
+                week.append(len(week))
+
+            plt.plot(week, tasks_temp, '-D', label=str(user), markevery=for_mark)
+            plt.xticks(week)
             if not team:
                 plt.title(f'Tasks for {user}')
-                plt.savefig(f'{user}-tasks.png')
+                if 'dev' not in os.listdir(os.getcwd()):
+                    os.makedirs('dev')
+                plt.savefig(f'dev/{user}-tasks.png')
                 plt.show()
         if team:
             plt.legend()
             plt.title('Tasks')
-            plt.savefig(f'team-tasks.png')
+            if 'team' not in os.listdir(os.getcwd()):
+                os.makedirs('team')
+            plt.savefig(f'team/team-tasks.png')
             plt.show()
 
     def get_median(self):
@@ -145,7 +174,7 @@ class JiraProxy(object):
         time_spent = 0
         for user in self.team:
             issues = self.jira.search_issues(
-                f'worklogAuthor = {user} AND (worklogDate >= startOfWeek({-7 * weeks}d) AND worklogDate <= endOfWeek(-7d)) and type in ({ticket_type}) and (labels = {label})')
+                f'worklogAuthor = {user} AND (worklogDate >= startOfWeek({-7 * weeks}d) AND worklogDate <= endOfWeek({-7 * weeks}d)) and type in ({ticket_type}) and (labels = {label})')
             for issue in issues:
                 work_logs = self.jira.worklogs(issue)
                 for work_log in work_logs:
@@ -165,3 +194,13 @@ class JiraProxy(object):
                     time_spent += work_log.timeSpentSeconds
 
         return time_spent / weeks
+
+    def forecast(self, values):
+        last = None
+        delta = 0
+        for value in values[-4:]:
+            if last:
+                delta += value - last
+            if value:
+                last = value
+        return float(last) * float(1 + delta / 100)
