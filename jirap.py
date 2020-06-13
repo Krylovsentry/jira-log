@@ -1,4 +1,5 @@
 import json
+import math
 import os
 
 import matplotlib.pyplot as plt
@@ -196,11 +197,5 @@ class JiraProxy(object):
         return time_spent / weeks
 
     def forecast(self, values):
-        last = None
-        delta = 0
-        for value in values[-4:]:
-            if last:
-                delta += value - last
-            if value:
-                last = value
-        return float(last) * float(1 + delta / 100)
+        mean = sum(values) / len(values)
+        return math.sqrt(sum(map(lambda x: (x - mean) ** 2, values)) / len(values))
