@@ -17,6 +17,7 @@ class JiraProxy(object):
         self.project = project
         self.jira_server = jira_server
         self.median = self.prev_data['median'] if 'median' in self.prev_data else 0
+        self.dev_weight = self.prev_data['dev_weight'] if 'dev_weight' in self.prev_data else 1
 
     def issues_resolved(self, user, type_of_issue):
         return self.jira.search_issues(
@@ -34,6 +35,10 @@ class JiraProxy(object):
             'customfield_10014': {'id': '10010'}
         }
         self.jira.create_issue(fields=issue_dict)
+
+    def load_data(self, path='data.json'):
+        with open(path, 'r') as f:
+            self.prev_data = json.load(f)
 
     def team_assign(self, count=2):
         for user in self.team.split(','):
@@ -86,6 +91,19 @@ class JiraProxy(object):
             bugs_count[key] = bugs_count[key] / self.median * 100
         return bugs_count
 
+    def check_un_estimate_tasks(self, week=1):
+        for user in self.team:
+            issues = self.jira.search_issues(
+                f'worklogAuthor = {user} AND (worklogDate >= startOfWeek(-{week * 7}d) AND worklogDate <= endOfWeek(-{week * 7}d)) and type in ("Dev Task") and (labels != "time-track" or labels is EMPTY )')
+            for issue in issues:
+                if not (issue.fields and issue.fields.timeoriginalestimate):
+                    print(f'{self.jira_server}/browse/{issue}')
+
+    def count_of_tickets_created(self, label, week=1, ticket_type='Defect'):
+        issues = self.jira.search_issues(
+            f'type in ({ticket_type}) AND component in ("CPQ UI", UX, "Admin UI") AND labels in ({label}) AND (created >= startOfWeek(-{week}) and created <=endOfWeek(-{week}))')
+        return len(issues)
+
     def update_data(self, path='data.json'):
         self.load_data()
         bugs = self.prev_data['bugs'] if 'bugs' in self.prev_data else []
@@ -97,10 +115,6 @@ class JiraProxy(object):
         data = {'tasks': tasks, 'bugs': bugs, 'median': self.get_median()}
         with open(path, 'w') as outfile:
             json.dump(data, outfile)
-
-    def load_data(self, path='data.json'):
-        with open(path, 'r') as f:
-            self.prev_data = json.load(f)
 
     def make_velocities(self, team=True):
         self.load_data()
@@ -115,8 +129,9 @@ class JiraProxy(object):
                 bug_temp.append(bugs[j][user] if user in bugs[j] else None)
                 week.append(j)
             for_mark = []
-            if len(list(filter(lambda x: x is not None, bug_temp))):
-                bug_temp.append(self.forecast(list(filter(lambda x: x is not None, bug_temp))))
+            filtered_bugs = list(filter(lambda x: x is not None, bug_temp))
+            if len(filtered_bugs):
+                bug_temp.append(self.forecast(filtered_bugs))
                 for_mark = [len(week), len(week) - 1]
                 week.append(len(week))
 
@@ -141,20 +156,21 @@ class JiraProxy(object):
         for user in self.team:
             tasks_temp = []
             week = []
-            delta = 0
             for j in range(len(tasks)):
                 current = tasks[j][user] if user in tasks[j].keys() else None
                 tasks_temp.append(current)
                 week.append(j)
             for_mark = []
-            if len(list(filter(lambda x: x is not None, tasks_temp))):
-                tasks_temp.append(self.forecast(list(filter(lambda x: x is not None, tasks_temp))))
+            filtered_tasks = list(filter(lambda x: x is not None, tasks_temp))
+            if len(filtered_tasks):
+                tasks_temp.append(self.forecast(filtered_tasks))
                 for_mark = [len(week), len(week) - 1]
                 week.append(len(week))
 
             plt.plot(week, tasks_temp, '-D', label=str(user), markevery=for_mark)
             plt.xticks(week)
             if not team:
+                self.dev_weight = (self.dev_weight + sum(filtered_tasks) / 100) / (len(filtered_tasks) + 1)
                 plt.title(f'Tasks for {user}')
                 if 'dev' not in os.listdir(os.getcwd()):
                     os.makedirs('dev')
@@ -171,6 +187,9 @@ class JiraProxy(object):
     def get_median(self):
         return self.median
 
+    def get_dev_weight(self):
+        return self.dev_weight
+
     def get_time_for(self, label, ticket_type="Defect", weeks=4):
         time_spent = 0
         for user in self.team:
@@ -182,7 +201,19 @@ class JiraProxy(object):
                     if work_log.author.key == user:
                         time_spent += work_log.timeSpentSeconds
 
-        return time_spent / weeks
+        return time_spent / (weeks * 3600)
+
+    def get_medium_time_for_bugs(self, label, weeks=1):
+        temp = []
+        for i in range(weeks):
+            temp.append(self.get_time_for(label, weeks=i + 1))
+        return sum(temp) / (weeks * self.get_median())
+
+    def get_medium_count_of_tickets_create(self, label, weeks=1):
+        temp = []
+        for i in range(weeks):
+            temp.append(self.count_of_tickets_created(label, week=i + 1))
+        return sum(temp) / weeks
 
     def get_time_for_tasks_for_user(self, label, user, ticket_type="Defect", weeks=1):
         time_spent = 0

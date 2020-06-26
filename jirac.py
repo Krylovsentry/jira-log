@@ -51,19 +51,18 @@ if __name__ == "__main__":
         str(team).split(','), user_name, component, project, jira_server
     )
 
-    jiraProxy.make_velocities()
-    jiraProxy.make_velocities(False)
+    # parser = ArgumentParser()
+    # parser.add_argument("-u", "--update",
+    #                     help="update data from previous week",
+    #                     default=False)
+    # parser.add_argument("-v", "--velocities",
+    #                     default=None,
+    #                     help="make velocities graphics for team or for every person")
+    #
+    # args = parser.parse_args()
+    # if args.update:
+    #     jiraProxy.update_data()
+    # elif args.velocities is not None:
+    #     jiraProxy.make_velocities(args.velocities)
 
-    parser = ArgumentParser()
-    parser.add_argument("-u", "--update",
-                        help="update data from previous week",
-                        default=False)
-    parser.add_argument("-v", "--velocities",
-                        default=None,
-                        help="make velocities graphics for team or for every person")
 
-    args = parser.parse_args()
-    if args.update:
-        jiraProxy.update_data()
-    elif args.velocities is not None:
-        jiraProxy.make_velocities(args.velocities)
