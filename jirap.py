@@ -6,14 +6,14 @@ import matplotlib.pyplot as plt
 
 
 class JiraProxy(object):
-    def __init__(self, jira, team, lead, component, project, jira_server, path='data.json'):
+    def __init__(self, jira, team, lead, components, project, jira_server, path='data.json'):
         with open(path, 'r') as f:
             self.prev_data = json.load(f)
 
         self.jira = jira
         self.team = team
         self.lead = lead
-        self.component = component
+        self.components = components
         self.project = project
         self.jira_server = jira_server
         self.median = self.prev_data['median'] if 'median' in self.prev_data else 0
@@ -24,17 +24,17 @@ class JiraProxy(object):
             f'status changed by {user} AND resolutiondate >= startOfWeek(-14d) AND resolutiondate < endOfWeek(-7d) '
             f'and type in ({type_of_issue})')
 
-    def create_issue(self, summary):
-        issue_dict = {
-            'project': self.project,
-            'summary': summary,
-            'description': summary,
-            'issuetype': {'name': 'Defect'},
-            'components': [{'name': self.component}],
-            'assignee': {'name': self.lead},
-            'customfield_10014': {'id': '10010'}
-        }
-        self.jira.create_issue(fields=issue_dict)
+    # def create_issue(self, summary):
+    #     issue_dict = {
+    #         'project': self.project,
+    #         'summary': summary,
+    #         'description': summary,
+    #         'issuetype': {'name': 'Defect'},
+    #         'components': [{'name': self.component}],
+    #         'assignee': {'name': self.lead},
+    #         'customfield_10014': {'id': '10010'}
+    #     }
+    #     self.jira.create_issue(fields=issue_dict)
 
     def load_data(self, path='data.json'):
         with open(path, 'r') as f:
@@ -99,9 +99,9 @@ class JiraProxy(object):
                 if not (issue.fields and issue.fields.timeoriginalestimate):
                     print(f'{self.jira_server}/browse/{issue}')
 
-    def count_of_tickets_created(self, label, week=1, ticket_type='Defect'):
+    def count_of_tickets_created(self, label, week=1,  ticket_type='Defect'):
         issues = self.jira.search_issues(
-            f'type in ({ticket_type}) AND component in ("CPQ UI", UX, "Admin UI") AND labels in ({label}) AND (created >= startOfWeek(-{week}) and created <=endOfWeek(-{week}))')
+            f'type in ({ticket_type}) AND component in ({", ".join(self.components)}) AND labels in ({label}) AND (created >= startOfWeek(-{week}) and created <=endOfWeek(-{week}))')
         return len(issues)
 
     def update_data(self, path='data.json'):
@@ -188,11 +188,21 @@ class JiraProxy(object):
         return self.median
 
     def get_dev_weight(self):
+        self.load_data()
+        tasks = self.prev_data['tasks']
+        for user in self.team:
+            tasks_temp = []
+            for j in range(len(tasks)):
+                current = tasks[j][user] if user in tasks[j].keys() else None
+                tasks_temp.append(current)
+            filtered_tasks = list(filter(lambda x: x is not None, tasks_temp))
+            if len(filtered_tasks):
+                self.dev_weight = (self.dev_weight + sum(filtered_tasks) / 100) / (len(filtered_tasks) + 1)
         return self.dev_weight
 
-    def get_time_for(self, label, ticket_type="Defect", weeks=4):
+    def get_time_for(self, label, ticket_type="Defect", weeks=4, excluding=[]):
         time_spent = 0
-        for user in self.team:
+        for user in [x for x in self.team if x not in excluding]:
             issues = self.jira.search_issues(
                 f'worklogAuthor = {user} AND (worklogDate >= startOfWeek({-7 * weeks}d) AND worklogDate <= endOfWeek({-7 * weeks}d)) and type in ({ticket_type}) and (labels = {label})')
             for issue in issues:
@@ -203,17 +213,20 @@ class JiraProxy(object):
 
         return time_spent / (weeks * 3600)
 
-    def get_medium_time_for_bugs(self, label, weeks=1):
+    def get_medium_time_for_bugs(self, label, weeks=1, excluding=[], with_forecast=False):
         temp = []
         for i in range(weeks):
-            temp.append(self.get_time_for(label, weeks=i + 1))
-        return sum(temp) / (weeks * self.get_median())
+            temp.append(self.get_time_for(label, weeks=i + 1, excluding=excluding))
 
-    def get_medium_count_of_tickets_create(self, label, weeks=1):
+        medium_time = sum(temp) / (weeks * self.get_median())
+        return medium_time if with_forecast else (medium_time, self.forecast(temp))
+
+    def get_medium_count_of_tickets_create(self, label, weeks=1, ticket_type="Defect", with_forecast=False):
         temp = []
         for i in range(weeks):
-            temp.append(self.count_of_tickets_created(label, week=i + 1))
-        return sum(temp) / weeks
+            temp.append(self.count_of_tickets_created(label, week=i + 1, ticket_type=ticket_type))
+        medium_count = sum(temp) / weeks
+        return medium_count if with_forecast else (medium_count, self.forecast(temp))
 
     def get_time_for_tasks_for_user(self, label, user, ticket_type="Defect", weeks=1):
         time_spent = 0
