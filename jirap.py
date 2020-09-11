@@ -19,11 +19,6 @@ class JiraProxy(object):
         self.median = self.prev_data['median'] if 'median' in self.prev_data else 0
         self.dev_weight = self.prev_data['dev_weight'] if 'dev_weight' in self.prev_data else 1
 
-    def issues_resolved(self, user, type_of_issue):
-        return self.jira.search_issues(
-            f'status changed by {user} AND resolutiondate >= startOfWeek(-14d) AND resolutiondate < endOfWeek(-7d) '
-            f'and type in ({type_of_issue})')
-
     # def create_issue(self, summary):
     #     issue_dict = {
     #         'project': self.project,
@@ -40,26 +35,16 @@ class JiraProxy(object):
         with open(path, 'r') as f:
             self.prev_data = json.load(f)
 
-    def team_assign(self, count=2):
-        for user in self.team.split(','):
-            issues = self.jira.search_issues(
-                f'assignee = {user} AND resolution = Unresolved and type in (Bug, Defect) and status in (Open)')
-            if issues.total < count:
-                lead_issues = self.jira.search_issues(
-                    f'assignee = {self.lead} AND resolution = Unresolved and type in (Bug, Defect) and status in (Open) ORDER BY priority DESC')
-                self.jira.assign_issue(lead_issues.next(), user)
-                self.jira.assign_issue(lead_issues.next(), user)
-
-    def time_logged(self, user, type_of_issue, other_conditions_with_and=""):
+    def time_logged(self, user, type_of_issue, labels, week=1, other_conditions_with_and=""):
         return self.jira.search_issues(
-            f'worklogAuthor = {user} AND (worklogDate >= startOfWeek(-14d) AND worklogDate <= endOfWeek(-14d)) and type in ({type_of_issue}) {other_conditions_with_and}'
+            f'worklogAuthor = {user} AND labels in ({labels}) AND (worklogDate >= startOfWeek({-7* week}d) AND worklogDate <= endOfWeek({-7* week}d)) and type in ({type_of_issue}) {other_conditions_with_and}'
         )
 
     def count_velocity_on_tasks(self, week=1):
         velocities = {}
         for user in self.team:
             issues = self.jira.search_issues(
-                f'worklogAuthor = {user} AND (worklogDate >= startOfWeek(-{week * 7}d) AND worklogDate <= endOfWeek(-{week * 7}d)) and type in ("Dev Task") and (labels != "time-track" or labels is EMPTY )')
+                f'worklogAuthor = {user} AND (worklogDate >= startOfWeek(-{week * 7}d) AND worklogDate <= endOfWeek(-{week * 7}d)) and type in ("Dev Task") and (labels != "time-track" or labels is EMPTY ) and status = Implemented')
 
             velocity_temp = []
             for issue in issues:
@@ -78,11 +63,10 @@ class JiraProxy(object):
                 velocities[user] = sum(velocity_temp) / len(velocity_temp)
         return velocities
 
-    def count_of_bugs(self, week=1):
+    def count_of_bugs_worked(self, labels, week=1):
         bugs_count = {}
         for user in self.team:
-            issues = self.jira.search_issues(
-                f'status changed by {user} AND resolutiondate >= startOfWeek(-{week * 7}d) AND resolutiondate < endOfWeek(-{week * 7}d)')
+            issues = self.time_logged(user, "Defect", labels, week)
             if len(issues):
                 bugs_count[user] = len(issues)
 
@@ -99,15 +83,20 @@ class JiraProxy(object):
                 if not (issue.fields and issue.fields.timeoriginalestimate):
                     print(f'{self.jira_server}/browse/{issue}')
 
-    def count_of_tickets_created(self, label, week=1,  ticket_type='Defect'):
+    def count_of_tickets_created(self, label, week=1,  ticket_type='Defect', priority=None):
+        if priority:
+            priority_boundary = f'AND priority >= {priority}'
         issues = self.jira.search_issues(
-            f'type in ({ticket_type}) AND component in ({", ".join(self.components)}) AND labels in ({label}) AND (created >= startOfWeek(-{week}) and created <=endOfWeek(-{week}))')
-        return len(issues)
+            f'type in ({ticket_type}) AND component in ({", ".join(self.components)}) AND labels in ({label}) AND (created >= startOfWeek(-{week}) and created <=endOfWeek(-{week})) {priority_boundary if priority else ""}')
+        return len(list(filter(self.filter_issues_by_label('HF'), issues)))
 
-    def update_data(self, path='data.json'):
+    def search_issues(self):
+        pass
+
+    def update_data(self, labels, path='data.json'):
         self.load_data()
         bugs = self.prev_data['bugs'] if 'bugs' in self.prev_data else []
-        bugs.append(self.count_of_bugs())
+        bugs.append(self.count_of_bugs_worked(labels))
 
         tasks = self.prev_data['tasks'] if 'tasks' in self.prev_data else []
         tasks.append(self.count_velocity_on_tasks())
@@ -129,11 +118,6 @@ class JiraProxy(object):
                 bug_temp.append(bugs[j][user] if user in bugs[j] else None)
                 week.append(j)
             for_mark = []
-            filtered_bugs = list(filter(lambda x: x is not None, bug_temp))
-            if len(filtered_bugs):
-                bug_temp.append(self.forecast(filtered_bugs))
-                for_mark = [len(week), len(week) - 1]
-                week.append(len(week))
 
             plt.plot(week, bug_temp, '-D', label=str(user), markevery=for_mark)
             plt.xticks(week)
@@ -162,11 +146,6 @@ class JiraProxy(object):
                 week.append(j)
             for_mark = []
             filtered_tasks = list(filter(lambda x: x is not None, tasks_temp))
-            if len(filtered_tasks):
-                tasks_temp.append(self.forecast(filtered_tasks))
-                for_mark = [len(week), len(week) - 1]
-                week.append(len(week))
-
             plt.plot(week, tasks_temp, '-D', label=str(user), markevery=for_mark)
             plt.xticks(week)
             if not team:
@@ -200,8 +179,9 @@ class JiraProxy(object):
                 self.dev_weight = (self.dev_weight + sum(filtered_tasks) / 100) / (len(filtered_tasks) + 1)
         return self.dev_weight
 
-    def get_time_for(self, label, ticket_type="Defect", weeks=4, excluding=[]):
+    def get_time_for(self, label, ticket_type="Defect", weeks=1, excluding=[]):
         time_spent = 0
+        count = 1
         for user in [x for x in self.team if x not in excluding]:
             issues = self.jira.search_issues(
                 f'worklogAuthor = {user} AND (worklogDate >= startOfWeek({-7 * weeks}d) AND worklogDate <= endOfWeek({-7 * weeks}d)) and type in ({ticket_type}) and (labels = {label})')
@@ -210,23 +190,24 @@ class JiraProxy(object):
                 for work_log in work_logs:
                     if work_log.author.key == user:
                         time_spent += work_log.timeSpentSeconds
+            if len(issues):
+                count += len(issues)
 
-        return time_spent / (weeks * 3600)
+        return time_spent / (3600 * count)
 
     def get_medium_time_for_bugs(self, label, weeks=1, excluding=[], with_forecast=False):
         temp = []
         for i in range(weeks):
             temp.append(self.get_time_for(label, weeks=i + 1, excluding=excluding))
 
-        medium_time = sum(temp) / (weeks * self.get_median())
-        return medium_time if with_forecast else (medium_time, self.forecast(temp))
+        return sum(temp) / weeks
 
-    def get_medium_count_of_tickets_create(self, label, weeks=1, ticket_type="Defect", with_forecast=False):
+    def get_medium_count_of_tickets_create(self, label, weeks=1, ticket_type="Defect", with_forecast=False, priority=None):
         temp = []
         for i in range(weeks):
-            temp.append(self.count_of_tickets_created(label, week=i + 1, ticket_type=ticket_type))
+            temp.append(self.count_of_tickets_created(label, week=i + 1, ticket_type=ticket_type, priority=priority))
         medium_count = sum(temp) / weeks
-        return medium_count if with_forecast else (medium_count, self.forecast(temp))
+        return medium_count
 
     def get_time_for_tasks_for_user(self, label, user, ticket_type="Defect", weeks=1):
         time_spent = 0
@@ -243,3 +224,13 @@ class JiraProxy(object):
     def forecast(self, values):
         mean = sum(values) / len(values)
         return math.sqrt(sum(map(lambda x: (x - mean) ** 2, values)) / len(values))
+
+    def filter_issues_by_label(self, label):
+        def filter_issues(issue):
+            if hasattr(issue, 'fields') and hasattr(issue.fields, 'labels'):
+                    return label not in issue.fields.labels
+            return True
+        return filter_issues
+
+    def reopened_tickets(self, label, type='Defect', week=1):
+        pass
