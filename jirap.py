@@ -37,8 +37,17 @@ class JiraProxy(object):
 
     def time_logged(self, user, type_of_issue, labels, week=1, other_conditions_with_and=""):
         return self.jira.search_issues(
-            f'worklogAuthor = {user} AND labels in ({labels}) AND (worklogDate >= startOfWeek({-7* week}d) AND worklogDate <= endOfWeek({-7* week}d)) and type in ({type_of_issue}) {other_conditions_with_and}'
+            f'worklogAuthor = {user} AND labels in ({labels}) AND (worklogDate >= startOfWeek({-7 * week}d) AND worklogDate <= endOfWeek({-7 * week}d)) and type in ({type_of_issue}) {other_conditions_with_and}'
         )
+
+    def bulk_issue_update(self, issues, update):
+        for issue in issues:
+            if 'UX/UI' in issue.fields.summary:
+                if 'UI/UX' not in issue.fields.labels :
+                    issue.add_field_value('labels', 'UI/UX')
+                for task in issue.fields.subtasks:
+                    if 'UI/UX' not in issue.fields.labels or not hasattr(task.fields, 'labels'):
+                        task.add_field_value('labels', 'UI/UX')
 
     def count_velocity_on_tasks(self, week=1):
         velocities = {}
@@ -54,7 +63,7 @@ class JiraProxy(object):
                     if work_log.author.key == user:
                         work_logs_unestimated += work_log.timeSpentSeconds
                 if issue.fields and issue.fields.timeoriginalestimate:
-                    velocity = issue.fields.timeoriginalestimate / work_logs_unestimated * 100
+                    velocity = issue.fields.timeoriginalestimate / (work_logs_unestimated if work_logs_unestimated > 0 else 1) * 100
                     velocity_temp.append(200 if velocity > 300 else velocity)
                 else:
                     print(f'{self.jira_server}/browse/{issue}')
@@ -83,23 +92,26 @@ class JiraProxy(object):
                 if not (issue.fields and issue.fields.timeoriginalestimate):
                     print(f'{self.jira_server}/browse/{issue}')
 
-    def count_of_tickets_created(self, label, week=1,  ticket_type='Defect', priority=None):
+    def count_of_tickets_created(self, label, week=1, ticket_type='Defect', priority=None):
         if priority:
             priority_boundary = f'AND priority >= {priority}'
+        print(
+            f'type in ({ticket_type}) AND component in ({", ".join(self.components)}) AND labels in ({label}) AND (created >= startOfWeek(-{week}) and created <=endOfWeek(-{week})) {priority_boundary if priority else ""}')
         issues = self.jira.search_issues(
             f'type in ({ticket_type}) AND component in ({", ".join(self.components)}) AND labels in ({label}) AND (created >= startOfWeek(-{week}) and created <=endOfWeek(-{week})) {priority_boundary if priority else ""}')
         return len(list(filter(self.filter_issues_by_label('HF'), issues)))
 
-    def search_issues(self):
-        pass
+    def search_issues(self, search_string):
+        return self.jira.search_issues(search_string)
 
-    def update_data(self, labels, path='data.json'):
+    def update_data(self, labels, path='data.json', weeks=1):
         self.load_data()
-        bugs = self.prev_data['bugs'] if 'bugs' in self.prev_data else []
-        bugs.append(self.count_of_bugs_worked(labels))
+        for week in range(1, weeks + 1):
+            bugs = self.prev_data['bugs'] if 'bugs' in self.prev_data else []
+            bugs.append(self.count_of_bugs_worked(labels, week))
 
-        tasks = self.prev_data['tasks'] if 'tasks' in self.prev_data else []
-        tasks.append(self.count_velocity_on_tasks())
+            tasks = self.prev_data['tasks'] if 'tasks' in self.prev_data else []
+            tasks.append(self.count_velocity_on_tasks(week))
 
         data = {'tasks': tasks, 'bugs': bugs, 'median': self.get_median()}
         with open(path, 'w') as outfile:
@@ -202,10 +214,12 @@ class JiraProxy(object):
 
         return sum(temp) / weeks
 
-    def get_medium_count_of_tickets_create(self, label, weeks=1, ticket_type="Defect", with_forecast=False, priority=None):
+    def get_medium_count_of_tickets_create(self, label, weeks=1, ticket_type="Defect", with_forecast=False,
+                                           priority=None):
         temp = []
         for i in range(weeks):
             temp.append(self.count_of_tickets_created(label, week=i + 1, ticket_type=ticket_type, priority=priority))
+        print(temp)
         medium_count = sum(temp) / weeks
         return medium_count
 
@@ -228,9 +242,11 @@ class JiraProxy(object):
     def filter_issues_by_label(self, label):
         def filter_issues(issue):
             if hasattr(issue, 'fields') and hasattr(issue.fields, 'labels'):
-                    return label not in issue.fields.labels
+                return label not in issue.fields.labels
             return True
+
         return filter_issues
 
     def reopened_tickets(self, label, type='Defect', week=1):
-        pass
+        return self.jira.search_issues(
+            f'type in ({type}) AND component in ({", ".join(self.components)}) AND labels in ({label}) AND status changed to reopened during (startOfWeek(-{week}w), endOfWeek(-{week}w)) and labels not in (invalid_reopen, InvalidReopen)')
