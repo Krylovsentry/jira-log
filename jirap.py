@@ -2,6 +2,7 @@ import json
 import math
 import os
 
+import jira
 import matplotlib.pyplot as plt
 
 
@@ -48,6 +49,30 @@ class JiraProxy(object):
         return self.jira.search_issues(
             f'worklogAuthor = {user} AND labels in ({labels}) AND (worklogDate >= startOfWeek({-7 * week}d) AND worklogDate <= endOfWeek({-7 * week}d)) and type in ({type_of_issue}) {other_conditions_with_and}'
         )
+
+    def issue_to_rft(self, issue):
+        # tns = self.jira.transitions(issue)
+        self.jira.transition_issue(issue, '301')
+
+    def issue_to_close(self, issue):
+        ticket = self.jira.issue(issue)
+        if ticket.fields.assignee.name == self.lead:
+            self.jira.transition_issue(issue, '71')
+        else:
+            previous_assignee = ticket.fields.assignee.name
+            self.jira.assign_issue(issue, self.lead)
+            self.jira.transition_issue(issue, '71')
+            self.jira.assign_issue(issue, previous_assignee)
+
+
+
+
+    def issue_counts_on_users(self):
+        issue_count = []
+        for user in self.team:
+            open_or_reopen = self.jira.search_issues()
+            in_progress = self.jira.search_issues()
+
 
     def bulk_issue_update(self, issues, update):
         for issue in issues:

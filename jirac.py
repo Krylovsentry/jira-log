@@ -77,17 +77,26 @@ async def root():
     return {"message": "Hello World"}
 
 
-@app.get("/tickets/external/{ticket_number}")
+@app.get("/tickets/external/{ticket_number}", tags=["PSUP JIRA"])
 async def get_ticket_external(ticket_number: str):
     ticket = jiraExternalProxy.get_ticket(ticket_number)
     return {
-        'ticketKey': ticket.key,
+        'externalKey': ticket.key,
         'description': ticket.fields.description + ' ' + ticket.fields.customfield_21220,
         'summary': ticket.fields.summary,
         'environment': ticket.fields.environment,
         'priority': ticket.fields.priority.name,
         'labels': ticket.fields.labels
     }
+
+@app.get("/tickets/external/{ticket_number}/clone", tags=["PSUP JIRA"])
+async def clone_ticket_external(ticket_number: str):
+    ticket = jiraExternalProxy.get_ticket(ticket_number)
+    createdIssue = jiraProxy.create_issue('[' + ticket.key + ']' + ticket.fields.summary, ticket.fields.description + ' ' + ticket.fields.customfield_21220,
+                                          priority=ticket.fields.priority.name,
+                                          environment=ticket.fields.environment or '', labels=ticket.fields.labels)
+    return createdIssue.key
+
 
 
 @app.get("/tickets/{ticket_number}")
@@ -108,11 +117,22 @@ async def create_ticket(ticket: Ticket):
 @app.post("/tickets/{ticket_number}/link")
 async def link_tickets(ticket_number: str, ticket_numbers):
     for el in ticket_numbers.split(','):
-        jiraProxy.create_issue_link_impl(ticket_number, el)
+        jiraProxy.create_issue_link_impl(ticket_number, el)\
+
+@app.post("/tickets/rft")
+async def tickets_to_rft(ticket_numbers):
+    for ticket_number in ticket_numbers.split(','):
+        jiraProxy.issue_to_rft(ticket_number)
+
+@app.post("/tickets/close")
+async def tickets_to_close(ticket_numbers):
+    for ticket_number in ticket_numbers.split(','):
+        jiraProxy.issue_to_close(ticket_number)
+
 
 
 @app.get("/tickets/")
-async def get_ticket(searchQuery: str = ''):
+async def get_tickets(searchQuery: str = ''):
     tickets = jiraProxy.search_issues(searchQuery)
     return {"tickets": ','.join([x.key for x in tickets])}
 
